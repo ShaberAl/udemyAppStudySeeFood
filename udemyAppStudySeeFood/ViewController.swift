@@ -19,9 +19,9 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
         super.viewDidLoad()
         
         imagePicker.delegate = self
-//        Can't access the camera through the simulator, so using photoLibrary
+//        Can't access the camera through the simulator, so using photoLibrary by simulator or camera on real device
 //        imagePicker.sourceType = .camera
-        imagePicker.sourceType = .photoLibrary
+//        imagePicker.sourceType = .photoLibrary
         imagePicker.allowsEditing = false
     }
 
@@ -32,9 +32,43 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         if let userPickedImage = info[UIImagePickerController.InfoKey.originalImage] as? UIImage {
             imageView.image = userPickedImage
+            
+            guard let ciimage = CIImage(image: userPickedImage) else {
+                fatalError("Couldn't convert into CIImage")
+            }
+            
+            detect(image: ciimage)
         }
         
         imagePicker.dismiss(animated: true)
+    }
+    
+    func detect(image: CIImage) {
+        
+        guard let model = try? VNCoreMLModel(for: Inceptionv3().model) else {
+            fatalError("Loading CoreML Model Failed.")
+        }
+        
+        let request = VNCoreMLRequest(model: model) { request, error in
+            guard let results = request.results as? [VNClassificationObservation] else {
+                fatalError("Model failed to process image.")
+            }
+            
+            if let firstResult = results.first {
+                if firstResult.identifier.contains("hotdog") {
+                    self.navigationItem.title = "Hotdog"
+                } else {
+                    self.navigationItem.title = "Not hotdog"
+                }
+            }
+        }
+        
+        let handler = VNImageRequestHandler(ciImage: image)
+        do {
+            try handler.perform([request])
+        } catch {
+            print("Error handling image \(error)")
+        }
     }
 }
 
